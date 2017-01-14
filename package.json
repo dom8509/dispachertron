@@ -1,16 +1,16 @@
 {
-  "name": "dispachertron",
+  "name": "dispatchertron",
   "version": "0.1.0",
   "description": "Dispatcher that dispatches events to the main and renderer process",
   "main": "index.js",
   "author": "Dominik Stamm",
   "license": "MIT",
   "scripts": {
-    "start": "electron main.js"
+    "test": "xvfb-maybe electron-mocha ./test/test.js"
   },
-  "repository": "https://github.com/dom8509/dispachertron.git",
+  "repository": "https://github.com/dom8509/dispatchertron.git",
   "bugs": {
-    "url": "https://github.com/dom8509/dispachertron/issues"
+    "url": "https://github.com/dom8509/dispatchertron/issues"
   },
   "dependencies": {
     "electron": "^1.4.14",
@@ -21,5 +21,9 @@
     "electron-component",
     "atom",
     "dispatcher"
-  ]
+  ],
+  "devDependencies": {
+    "electron-mocha": "^3.3.0",
+    "xvfb-maybe": "^0.1.3"
+  }
 }
