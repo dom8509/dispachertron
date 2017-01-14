@@ -1,0 +1,25 @@
+{
+  "name": "dispachertron",
+  "version": "0.1.0",
+  "description": "Dispatcher that dispatches events to the main and renderer process",
+  "main": "index.js",
+  "author": "Dominik Stamm",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron main.js"
+  },
+  "repository": "https://github.com/dom8509/dispachertron.git",
+  "bugs": {
+    "url": "https://github.com/dom8509/dispachertron/issues"
+  },
+  "dependencies": {
+    "electron": "^1.4.14",
+    "is-electron-renderer": "^2.0.1"
+  },
+  "keywords": [
+    "electron",
+    "electron-component",
+    "atom",
+    "dispatcher"
+  ]
+}
