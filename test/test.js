@@ -1,5 +1,5 @@
 const assert = require('assert')
-const {Dispatcher} = require('../index')
+const {Dispatcher} = require('..')
 
 describe('Local Dispatching', function() {
   describe('#Main Process', function() {
