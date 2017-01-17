@@ -1,32 +1,50 @@
+const {BrowserWindow} = require('electron');
+const window = require('electron-window')
 const assert = require('assert')
+const path = require('path')
 const {Dispatcher} = require('..')
 
+Promise.prototype.finally = function (callback) {
+        let p = this.constructor;
+        // We don’t invoke the callback in here,
+        // because we want then() to handle its exceptions
+        return this.then(
+            // Callback fulfills: pass on predecessor settlement
+            // Callback rejects: pass on rejection (=omit 2nd arg.)
+            value  => p.resolve(callback()).then(() => value),
+            reason => p.resolve(callback()).then(() => { throw reason })
+        );
+    };
+
 describe('Local Dispatching', function() {
+
   describe('#Main Process', function() {
     it('dispatch event to 1 main process listener', function() {
     	let called = false;
-    	Dispatcher.register((payload) => {
+    	let id = Dispatcher.register((payload) => {
     		called = true;
     	});
 
     	assert(!called);
     	Dispatcher.dispatch('test-event');
     	assert(called);
+
+        Dispatcher.unregister(id);
     });
 
     it('dispatch event to 3 main process listener', function() {
     	let called = [false, false, false];
-    	Dispatcher.register((payload) => {
+    	let id1 = Dispatcher.register((payload) => {
     		if (payload == 'test-event-0') {
     			called[0] = true;
     		}
     	});
-    	Dispatcher.register((payload) => {
+    	let id2 = Dispatcher.register((payload) => {
     		if (payload == 'test-event-1') {
     			called[1] = true;
     		}
     	});
-    	Dispatcher.register((payload) => {
+    	let id3 = Dispatcher.register((payload) => {
     		if (payload == 'test-event-2') {
     			called[2] = true;
     		}
@@ -51,6 +69,10 @@ describe('Local Dispatching', function() {
     	assert(called[0]);
     	assert(called[1]);
     	assert(called[2]);
+
+        Dispatcher.unregister(id1);
+        Dispatcher.unregister(id2);
+        Dispatcher.unregister(id3);
     });   
 
     it('unregister listener', function() {
@@ -77,6 +99,29 @@ describe('Local Dispatching', function() {
     	assert(called);
     	Dispatcher.dispatch('test-event-unset');
     	assert(called);
+
+        Dispatcher.unregister(id_set);
     }); 
   });
+
+  describe('#Inter Process', function() {
+    it('dispatch from renderer to main', function() {
+        return new Promise((resolve, reject) => {
+            var id = Dispatcher.register((payload) => {
+                if (payload == 'test-renderer-event') {
+                    resolve();
+                } else {
+                    reject();
+                }
+            });
+
+            var win = window.createWindow({ height: 700, width: 1200, 'web-preferences': { 'web-security': false } })
+
+            var indexPath = path.resolve(path.join(__dirname, 'dispatchertron-test-app/index.html'))
+            win._loadURLWithArgs(indexPath, Function());
+        })
+        .then(val => {assert(true)})
+        .catch(err => {assert(false)})
+    });        
+  });  
 });  
