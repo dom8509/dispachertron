@@ -18,6 +18,16 @@ Promise.prototype.finally = function (callback) {
 
 describe('Local Dispatching', function() {
 
+    // beforeEach(() => {
+    //     console.log('local listeners:', Dispatcher.getNumLocalListeners())
+    //     Dispatcher.getNumListeners()
+    //         .then((value) => {
+    //                 console.log('num listeners:', value);
+    //                 assert(value == 0);
+    //             })
+    //         .catch(err => console.log('failed', err));
+    // });
+
   describe('#Main Process', function() {
     it('dispatch event to 1 main process listener', function() {
     	let called = false;
@@ -121,7 +131,25 @@ describe('Local Dispatching', function() {
             win._loadURLWithArgs(indexPath, Function());
         })
         .then(val => {assert(true)})
-        .catch(err => {assert(false)})
-    });        
+        .catch(err => {console.log(err); assert(false)})
+    });  
+
+    var win2 = null;
+
+    it('get number of callbacks registered by renderer', function() {
+        return new Promise((resolve, reject) => {
+            win2 = window.createWindow({ height: 700, width: 1200, 'web-preferences': { 'web-security': false } })
+
+            var indexPath = path.resolve(path.join(__dirname, 'dispatchertron-test-get-num-remote-callbacks/index.html'))
+            win2._loadURLWithArgs(indexPath, Function());
+
+            win2.webContents.on('dom-ready', () => {
+                resolve();
+            })
+        })
+        .then(() => {return Dispatcher.getNumListeners()})
+        .then(value => {assert(value == 5)})
+        .catch(err => {console.log(err); assert(false)})
+    });  
   });  
 });  

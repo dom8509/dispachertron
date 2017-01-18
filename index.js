@@ -9,11 +9,9 @@ class Dispatcher {
   constructor() {
     this._prefix = 'ID_';
     this._lastID = 0;
-    this._callbacks = {};
+    this._callbacks = [];
 
     this._dispatchingRunning = false;
-    this._dispatchingResolve = null;
-    this._dispatchingReject = null;
   }
 
   register(callback)  {
@@ -44,17 +42,15 @@ class Dispatcher {
   }
 
   getNumListeners() {
-  	return (new Promise(resolve => {
-  			let remotesListeners = ipc_send_get_num_listeners();
-  			remotesListeners.then(values => {
-  				getNumLocalListeners() + resolve(values.reduce((a, b) => a + b));
-  			});
-  		})
-  	);
+  	return (ipc_send_get_num_listeners().then(values => {
+  		return (new Promise(resolve => {
+  			resolve(values.reduce((a, b) => a + b));
+  		}))
+  	}))
   }
 
   getNumLocalListeners() {
-    return this._callbacks.length();
+    return Object.keys(this._callbacks).length;
   }
 
   clear() {
@@ -119,16 +115,22 @@ if (isRenderer) {
 // ==============================================================
 
 ipc_send = (event, statusArray, payload) => {
-  return Promise.all(_remoteListeners.map((elem, idx) => {
-    return new Promise((resolve, reject) => {
-      statusArray[idx] = {
-        resolve: resolve,
-        reject: reject
-      }
+  let ipc_send_promisses = [Promise.resolve(0)];
 
-      elem.send(event, {idx: idx, data: payload});
-    })
-  }));
+  if (_remoteListeners.length > 0) {
+  	ipc_send_promisses = _remoteListeners.map((elem, idx) => {
+	    return new Promise((resolve, reject) => {
+	      statusArray[idx] = {
+	        resolve: resolve,
+	        reject: reject
+	      }
+
+	      elem.send(event, {idx: idx, data: payload});
+	    })
+	});
+  }
+
+  return Promise.all(ipc_send_promisses);
 };
 
 ipc_send_event = (payload) => {
