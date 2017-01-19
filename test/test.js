@@ -1,32 +1,17 @@
 const {BrowserWindow} = require('electron');
 const window = require('electron-window')
-const assert = require('assert')
-const path = require('path')
-const {Dispatcher} = require('..')
+const {assert, expect} = require('chai')
 
-Promise.prototype.finally = function (callback) {
-        let p = this.constructor;
-        // We don’t invoke the callback in here,
-        // because we want then() to handle its exceptions
-        return this.then(
-            // Callback fulfills: pass on predecessor settlement
-            // Callback rejects: pass on rejection (=omit 2nd arg.)
-            value  => p.resolve(callback()).then(() => value),
-            reason => p.resolve(callback()).then(() => { throw reason })
-        );
-    };
+const path = require('path')
+const {Dispatcher, getNumRemoteListeners, clearRemoteListeners} = require('..')
 
 describe('Local Dispatching', function() {
 
-    // beforeEach(() => {
-    //     console.log('local listeners:', Dispatcher.getNumLocalListeners())
-    //     Dispatcher.getNumListeners()
-    //         .then((value) => {
-    //                 console.log('num listeners:', value);
-    //                 assert(value == 0);
-    //             })
-    //         .catch(err => console.log('failed', err));
-    // });
+    var win = null;
+
+    beforeEach(() => {
+        clearRemoteListeners();
+    });
 
   describe('#Main Process', function() {
     it('dispatch event to 1 main process listener', function() {
@@ -114,42 +99,105 @@ describe('Local Dispatching', function() {
     }); 
   });
 
-  describe('#Inter Process', function() {
-    it('dispatch from renderer to main', function() {
-        return new Promise((resolve, reject) => {
-            var id = Dispatcher.register((payload) => {
-                if (payload == 'test-renderer-event') {
-                    resolve();
-                } else {
-                    reject();
-                }
+  describe('#Renderer Process', function() {
+    it('dispatch event to 1 renderer process listener', function() {
+        return Dispatcher.clear()
+        .then(() => {return Dispatcher.getNumListeners()})
+        .then(value => {
+            expect(value).to.equal(0);
+            expect(getNumRemoteListeners()).to.equal(0);
+            return new Promise((resolve, reject) => {
+                var id = Dispatcher.register((payload) => {
+                    if (payload == 'main-to-renderer-event-1-ack') {
+                        resolve();
+                    } else {
+                        reject();
+                    }
+                });
+
+                win = window.createWindow({ height: 700, width: 1200, 'web-preferences': { 'web-security': false } })
+
+                var indexPath = path.resolve(path.join(__dirname, 'dispatchertron-test-get-num-remote-callbacks/index.html'))
+                win._loadURLWithArgs(indexPath, () => {resolve()});
+            })
+        })
+        .then(val => {
+            let p = new Promise((resolve, reject) => {
+                Dispatcher.register((payload) => {
+                    if (payload == 'main-to-renderer-event-1-ack') {
+                        resolve();
+                    }
+                });
             });
 
-            var win = window.createWindow({ height: 700, width: 1200, 'web-preferences': { 'web-security': false } })
+            Dispatcher.dispatch('main-to-renderer-event-1')
 
-            var indexPath = path.resolve(path.join(__dirname, 'dispatchertron-test-app/index.html'))
-            win._loadURLWithArgs(indexPath, Function());
+            return p;
         })
-        .then(val => {assert(true)})
-        .catch(err => {console.log(err); assert(false)})
+        .then(() => {
+            return (new Promise((resolve, reject) => {
+                win.on('closed', () => {resolve()});
+                win.close();
+            }));
+        })
+        .then(() => {expect(win.isDestroyed()).to.be.true})
+        .catch(err => {console.log(err)})        
+    });
+
+    it('dispatch from renderer to main', () => {
+        return Dispatcher.clear()
+        .then(() => {return Dispatcher.getNumListeners()})
+        .then(value => {
+            expect(value).to.equal(0);
+            expect(getNumRemoteListeners()).to.equal(0);
+            return new Promise((resolve, reject) => {
+                var id = Dispatcher.register((payload) => {
+                    if (payload == 'test-renderer-event') {
+                        resolve(true);
+                    } else {
+                        resolve(false);
+                    }
+                });
+
+                win = window.createWindow({ height: 700, width: 1200, 'web-preferences': { 'web-security': false } })
+
+                var indexPath = path.resolve(path.join(__dirname, 'dispatchertron-test-app/index.html'))
+                win._loadURLWithArgs(indexPath, Function());
+            })
+        })
+        .then(() => {
+            return (new Promise((resolve, reject) => {
+                win.on('closed', () => {resolve()});
+                win.close();
+            }));
+        })
+        .then(() => {expect(win.isDestroyed()).to.be.true})
+        .catch(err => {console.log(err)})
     });  
 
-    var win2 = null;
+    it('get number of callbacks registered by renderer', () => {
+        return Dispatcher.clear()
+        .then(() => {return Dispatcher.getNumListeners()})
+        .then(value => {
+            expect(value).to.equal(0);
+            expect(getNumRemoteListeners()).to.equal(0);
+            return new Promise((resolve, reject) => {
+                win = window.createWindow({ height: 700, width: 1200, 'web-preferences': { 'web-security': false } })
 
-    it('get number of callbacks registered by renderer', function() {
-        return new Promise((resolve, reject) => {
-            win2 = window.createWindow({ height: 700, width: 1200, 'web-preferences': { 'web-security': false } })
-
-            var indexPath = path.resolve(path.join(__dirname, 'dispatchertron-test-get-num-remote-callbacks/index.html'))
-            win2._loadURLWithArgs(indexPath, Function());
-
-            win2.webContents.on('dom-ready', () => {
-                resolve();
+                var indexPath = path.resolve(path.join(__dirname, 'dispatchertron-test-get-num-remote-callbacks/index.html'))
+                win._loadURLWithArgs(indexPath, () => {resolve()});
             })
         })
         .then(() => {return Dispatcher.getNumListeners()})
-        .then(value => {assert(value == 5)})
-        .catch(err => {console.log(err); assert(false)})
-    });  
+        .then(value => {
+            expect(value).to.equal(5);
+            return (new Promise((resolve, reject) => {
+                win.on('closed', () => {resolve()});
+                win.close();
+            }));
+        })
+        .then(() => {expect(win.isDestroyed()).to.be.true})
+        .catch(err => {console.log(err)})
+    });       
   });  
 });  

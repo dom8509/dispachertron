@@ -88,6 +88,14 @@ addRemoteListener = function(webcontents) {
   _remoteListeners.push(webcontents);
 }
 
+getNumRemoteListeners = function(webcontents) {
+  return Object.keys(_remoteListeners).length;
+}
+
+clearRemoteListeners = function(webcontents) {
+  _remoteListeners = [];
+}
+
 // ==============================================================
 
 var ipc = null;
@@ -185,5 +193,7 @@ ipc.on(GET_NUM_LISTENERS_EVENT + EVENT_SUFFIX_SUCCESS, (event, args) => {
 
 module.exports = {
   Dispatcher: dispatcher,
-  addRemoteListener: addRemoteListener
+  addRemoteListener: addRemoteListener,
+  getNumRemoteListeners: getNumRemoteListeners,
+  clearRemoteListeners: clearRemoteListeners
 }
