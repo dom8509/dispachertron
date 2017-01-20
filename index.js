@@ -34,7 +34,7 @@ class Dispatcher {
     }
 
     return (ipc_send_event(payload).then(() => {
-      return (new Promise(resolve => {
+      return (new Promise(() => {
         this._dispatchingRunning = false;
       }));
     }));
@@ -90,7 +90,7 @@ const EVENT_SUFFIX_FAILURE = '-failure';
 var _remoteRenderers = [];
 var _remoteRendererId = 0;
 
-addRemoteRenderer = function(window) {
+function addRemoteRenderer(window) {
   var id = 'ID_' + _remoteRendererId++;
   _remoteRenderers[id] = window.webContents;
 
@@ -99,7 +99,7 @@ addRemoteRenderer = function(window) {
   })
 }
 
-getNumRemoteRenderers = function(webcontents) {
+function getNumRemoteRenderers() {
   return Object.keys(_remoteRenderers).length;
 }
 
@@ -120,7 +120,7 @@ if (isRenderer) {
 
   // register this renderer to the main thread
   const remote = electron.remote;
-  var remoteListenerId = remote.require(path.join(__dirname)).addRemoteRenderer(remote.getCurrentWindow());
+  remote.require(path.join(__dirname)).addRemoteRenderer(remote.getCurrentWindow());
 
   _remoteRenderers['ID_0'] = ipc;
 } else {
@@ -129,7 +129,7 @@ if (isRenderer) {
 
 // ==============================================================
 
-ipc_send = (event, statusArray, payload) => {
+function ipc_send(event, statusArray, payload) {
   let ipc_send_promisses = [Promise.resolve(0)];
 
   if (Object.keys(_remoteRenderers).length > 0) {
@@ -148,17 +148,17 @@ ipc_send = (event, statusArray, payload) => {
   return Promise.all(ipc_send_promisses);
 };
 
-ipc_send_event = (payload) => {
+function ipc_send_event(payload) {
   ipc_send_event_status = Array(_remoteRenderers.length);
   return ipc_send(DISPATCH_EVENT, ipc_send_event_status, payload);
 };
 
-ipc_send_clear = () => {
+function ipc_send_clear() {
   ipc_send_clear_status = Array(_remoteRenderers.length);
   return ipc_send(CLEAR_EVENT, ipc_send_clear_status, '');
 };  
 
-ipc_send_get_num_listeners = () => {
+function ipc_send_get_num_listeners() {
   ipc_send_get_num_listeners_status = Array(_remoteRenderers.length);
   return ipc_send(GET_NUM_LISTENERS_EVENT, ipc_send_get_num_listeners_status, '');
 };  

@@ -25,9 +25,9 @@
   ],
   "devDependencies": {
     "chai": "^3.5.0",
-    "chai-as-promised": "^6.0.0",
     "electron-mocha": "^3.3.0",
     "electron-window": "^0.8.1",
+    "eslint": "^3.13.1",
     "xvfb-maybe": "^0.1.3"
   }
 }
