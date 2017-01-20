@@ -25,6 +25,7 @@ class Dispatcher {
     delete this._callbacks[id];
   }
 
+  // Todo:
   dispatch(payload) {
     this._dispatchingRunning = true;
 
@@ -32,7 +33,11 @@ class Dispatcher {
       this._callbacks[id](payload);
     }
 
-    return ipc_send_event(payload);
+    return (ipc_send_event(payload).then(() => {
+      return (new Promise(resolve => {
+        this._dispatchingRunning = false;
+      }));
+    }));
   }
 
   _local_dispatch(payload) {
@@ -45,8 +50,8 @@ class Dispatcher {
   	return (ipc_send_get_num_listeners().then(values => {
   		return (new Promise(resolve => {
   			resolve(values.reduce((a, b) => a + b));
-  		}))
-  	}))
+  		}));
+  	}));
   }
 
   getNumLocalListeners() {
@@ -82,18 +87,20 @@ const EVENT_SUFFIX_FAILURE = '-failure';
 // ==============================================================
 
 // in main process
-var _remoteListeners = [];
+var _remoteRenderers = [];
+var _remoteRendererId = 0;
 
-addRemoteListener = function(webcontents) {
-  _remoteListeners.push(webcontents);
+addRemoteRenderer = function(window) {
+  var id = 'ID_' + _remoteRendererId++;
+  _remoteRenderers[id] = window.webContents;
+
+  window.on('close', () => {
+    delete _remoteRenderers[id];
+  })
 }
 
-getNumRemoteListeners = function(webcontents) {
-  return Object.keys(_remoteListeners).length;
-}
-
-clearRemoteListeners = function(webcontents) {
-  _remoteListeners = [];
+getNumRemoteRenderers = function(webcontents) {
+  return Object.keys(_remoteRenderers).length;
 }
 
 // ==============================================================
@@ -113,9 +120,9 @@ if (isRenderer) {
 
   // register this renderer to the main thread
   const remote = electron.remote;
-  remote.require(path.join(__dirname)).addRemoteListener(remote.getCurrentWebContents());
+  var remoteListenerId = remote.require(path.join(__dirname)).addRemoteRenderer(remote.getCurrentWindow());
 
-  _remoteListeners.push(ipc);
+  _remoteRenderers['ID_0'] = ipc;
 } else {
   ipc = electron.ipcMain;
 }
@@ -125,34 +132,34 @@ if (isRenderer) {
 ipc_send = (event, statusArray, payload) => {
   let ipc_send_promisses = [Promise.resolve(0)];
 
-  if (_remoteListeners.length > 0) {
-  	ipc_send_promisses = _remoteListeners.map((elem, idx) => {
+  if (Object.keys(_remoteRenderers).length > 0) {
+  	ipc_send_promisses = Object.keys(_remoteRenderers).map((id, idx) => {
 	    return new Promise((resolve, reject) => {
 	      statusArray[idx] = {
 	        resolve: resolve,
 	        reject: reject
 	      }
 
-	      elem.send(event, {idx: idx, data: payload});
+        _remoteRenderers[id].send(event, {idx: idx, data: payload});
 	    })
-	});
+	  });
   }
 
   return Promise.all(ipc_send_promisses);
 };
 
 ipc_send_event = (payload) => {
-  ipc_send_event_status = Array(_remoteListeners.length);
+  ipc_send_event_status = Array(_remoteRenderers.length);
   return ipc_send(DISPATCH_EVENT, ipc_send_event_status, payload);
 };
 
 ipc_send_clear = () => {
-  ipc_send_clear_status = Array(_remoteListeners.length);
+  ipc_send_clear_status = Array(_remoteRenderers.length);
   return ipc_send(CLEAR_EVENT, ipc_send_clear_status, '');
 };  
 
 ipc_send_get_num_listeners = () => {
-  ipc_send_get_num_listeners_status = Array(_remoteListeners.length);
+  ipc_send_get_num_listeners_status = Array(_remoteRenderers.length);
   return ipc_send(GET_NUM_LISTENERS_EVENT, ipc_send_get_num_listeners_status, '');
 };  
 
@@ -193,7 +200,6 @@ ipc.on(GET_NUM_LISTENERS_EVENT + EVENT_SUFFIX_SUCCESS, (event, args) => {
 
 module.exports = {
   Dispatcher: dispatcher,
-  addRemoteListener: addRemoteListener,
-  getNumRemoteListeners: getNumRemoteListeners,
-  clearRemoteListeners: clearRemoteListeners
+  addRemoteRenderer: addRemoteRenderer,
+  getNumRemoteRenderers: getNumRemoteRenderers
 }
