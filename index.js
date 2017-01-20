@@ -90,7 +90,7 @@ const EVENT_SUFFIX_FAILURE = '-failure';
 var _remoteRenderers = [];
 var _remoteRendererId = 0;
 
-function addRemoteRenderer(window) {
+var addRemoteRenderer = function(window) {
   var id = 'ID_' + _remoteRendererId++;
   _remoteRenderers[id] = window.webContents;
 
@@ -99,7 +99,7 @@ function addRemoteRenderer(window) {
   })
 }
 
-function getNumRemoteRenderers() {
+var getNumRemoteRenderers = function() {
   return Object.keys(_remoteRenderers).length;
 }
 
@@ -146,22 +146,22 @@ function ipc_send(event, statusArray, payload) {
   }
 
   return Promise.all(ipc_send_promisses);
-};
+}
 
-function ipc_send_event(payload) {
+var ipc_send_event = function(payload) {
   ipc_send_event_status = Array(_remoteRenderers.length);
   return ipc_send(DISPATCH_EVENT, ipc_send_event_status, payload);
-};
+}
 
-function ipc_send_clear() {
+var ipc_send_clear = function() {
   ipc_send_clear_status = Array(_remoteRenderers.length);
   return ipc_send(CLEAR_EVENT, ipc_send_clear_status, '');
-};  
+} 
 
-function ipc_send_get_num_listeners() {
+var ipc_send_get_num_listeners = function() {
   ipc_send_get_num_listeners_status = Array(_remoteRenderers.length);
   return ipc_send(GET_NUM_LISTENERS_EVENT, ipc_send_get_num_listeners_status, '');
-};  
+}
 
 // ==============================================================
 
