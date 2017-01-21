@@ -49,7 +49,7 @@ class Dispatcher {
   getNumListeners() {
   	return (ipc_send_get_num_listeners().then(values => {
   		return (new Promise(resolve => {
-  			resolve(values.reduce((a, b) => a + b));
+  			resolve(values.reduce((a, b) => a + b) + this.getNumLocalListeners());
   		}));
   	}));
   }
