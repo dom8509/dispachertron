@@ -26,6 +26,6 @@ Dispatcher.register(payload => {
 
 Dispatcher.register(payload => {
 	if (payload == 'main-to-renderer-event-5') {
-		Dispatcher.dispatch('main-to-renderer-event-6-ack');
+		Dispatcher.dispatch('main-to-renderer-event-5-ack');
 	}
 });

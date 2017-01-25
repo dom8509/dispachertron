@@ -217,7 +217,7 @@ describe('Test Dispatching', () => {
         Dispatcher.unregister(id3);
     });
 
-    it('dispatch event from mein to renderer', function () {
+    it('dispatch event from main to renderer', function () {
         return Dispatcher.clear()
             .then(() => { return Dispatcher.getNumListeners() })
             .then(value => {
