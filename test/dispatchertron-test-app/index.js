@@ -1,3 +1,3 @@
-const {Dispatcher} = require(__dirname + '/../..');
+const {Dispatcher} = require('../..');
 
 Dispatcher.dispatch('test-renderer-event');

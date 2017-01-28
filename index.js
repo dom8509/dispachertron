@@ -1,4 +1,3 @@
-
 const path = require('path');
 const electron = require('electron');
 const isRenderer = require('is-electron-renderer');
@@ -10,38 +9,34 @@ const CLEAR_EVENT = 'dispatchertron-clear-event';
 const GET_NUM_LISTENERS_EVENT = 'dispatchertron-getnumlisteners-event';
 
 const EVENT_SUFFIX_SUCCESS = '-success';
-const EVENT_SUFFIX_FAILURE = '-failure';
+// const EVENT_SUFFIX_FAILURE = '-failure';
 
 // ==============================================================
 
 // in main process
-var _remoteRenderers = [];
-var _remoteRendererId = 0;
+const _remoteRenderers = [];
+let _remoteRendererId = 0;
 
-var addRemoteRenderer = function (window) {
-  var id = 'ID_' + _remoteRendererId++;
+const addRemoteRenderer = function (window) {
+  const id = 'ID_' + _remoteRendererId++;
   _remoteRenderers[id] = window.webContents;
 
   window.on('close', () => {
     delete _remoteRenderers[id];
-  })
-}
+  });
+};
 
-var getNumRemoteRenderers = function () {
+const getNumRemoteRenderers = function () {
   return Object.keys(_remoteRenderers).length;
-}
+};
 
 // ==============================================================
 
-var ipc = null;
+let ipc = null;
 
-var ipc_send_event = null;
-var ipc_send_clear = null;
-var ipc_send_get_num_listeners = null;
-
-var ipc_send_event_status = null;
-var ipc_send_clear_status = null;
-var ipc_send_get_num_listeners_status = null;
+let ipcSendEventStatus = null;
+let ipcSendClearStatus = null;
+let ipcSendGetNumListenersStatus = null;
 
 if (isRenderer) {
   ipc = electron.ipcRenderer;
@@ -50,10 +45,49 @@ if (isRenderer) {
   const remote = electron.remote;
   remote.require(path.join(__dirname)).addRemoteRenderer(remote.getCurrentWindow());
 
-  _remoteRenderers['ID_0'] = ipc;
+  _remoteRenderers.ID_0 = ipc;
 } else {
   ipc = electron.ipcMain;
 }
+
+// ==============================================================
+
+function ipcSend(event, statusArray, payload) {
+  let ipcSendPromisses = [Promise.resolve(0)];
+
+  if (getNumRemoteRenderers() > 0) {
+    ipcSendPromisses = Object.keys(_remoteRenderers).map((id, idx) => {
+      return new Promise((resolve, reject) => {
+        statusArray[idx] = {
+          resolve,
+          reject
+        };
+
+        _remoteRenderers[id].send(event, {
+          idx,
+          data: payload
+        });
+      });
+    });
+  }
+
+  return Promise.all(ipcSendPromisses);
+}
+
+const ipcSendEvent = function (payload) {
+  ipcSendEventStatus = Array(_remoteRenderers.length);
+  return ipcSend(DISPATCH_EVENT, ipcSendEventStatus, payload);
+};
+
+const ipcSendClear = function () {
+  ipcSendClearStatus = Array(_remoteRenderers.length);
+  return ipcSend(CLEAR_EVENT, ipcSendClearStatus, '');
+};
+
+const ipcSendGetNumListeners = function () {
+  ipcSendGetNumListenersStatus = Array(_remoteRenderers.length);
+  return ipcSend(GET_NUM_LISTENERS_EVENT, ipcSendGetNumListenersStatus, '');
+};
 
 // ==============================================================
 
@@ -67,7 +101,7 @@ class Dispatcher {
   }
 
   register(callback) {
-    let id = this._prefix + this._lastID++;
+    const id = this._prefix + this._lastID++;
     this._callbacks[id] = callback;
 
     return id;
@@ -83,12 +117,10 @@ class Dispatcher {
     if (!this._dispatchingRunning) {
       this._dispatchingRunning = true;
 
-      for (let id in this._callbacks) {
-        this._callbacks[id](payload);
-      }
+      this._localDispatch(payload);
 
       if (getNumRemoteRenderers() > 0) {
-        result = (ipc_send_event(payload).then(() => {
+        result = (ipcSendEvent(payload).then(() => {
           return (new Promise(resolve => {
             this._dispatchingRunning = false;
             resolve();
@@ -103,7 +135,7 @@ class Dispatcher {
   }
 
   getNumListeners() {
-    return (ipc_send_get_num_listeners().then(values => {
+    return (ipcSendGetNumListeners().then(values => {
       return (new Promise(resolve => {
         resolve(values.reduce((a, b) => a + b) + this.getNumLocalListeners());
       }));
@@ -120,12 +152,10 @@ class Dispatcher {
     if (!this._dispatchingRunning) {
       this._dispatchingRunning = true;
 
-      for (let id in this._callbacks) {
-        delete this._callbacks[id];
-      }
+      this._localClear();
 
       if (getNumRemoteRenderers() > 0) {
-        result = (ipc_send_clear().then(() => {
+        result = (ipcSendClear().then(() => {
           return (new Promise(resolve => {
             this._dispatchingRunning = false;
             resolve();
@@ -139,34 +169,20 @@ class Dispatcher {
     return result;
   }
 
-  forceClear() {
-    let result = Promise.resolve();
-
-    for (let id in this._callbacks) {
-      delete this._callbacks[id];
-    }
-
-    if (getNumRemoteRenderers() > 0) {
-      result = (ipc_send_clear().then(() => {
-        return (new Promise(resolve => {
-          resolve();
-        }));
-      }));
-    }
-
-    return result;
-  }
-
   // private functions
   _localDispatch(payload) {
-    for (let id in this._callbacks) {
-      this._callbacks[id](payload);
+    for (const id in this._callbacks) {
+      if (Object.prototype.hasOwnProperty.call(this._callbacks, id)) {
+        this._callbacks[id](payload);
+      }
     }
   }
 
   _localClear() {
-    for (let id in this._callbacks) {
-      delete this._callbacks[id];
+    for (const id in this._callbacks) {
+      if (Object.prototype.hasOwnProperty.call(this._callbacks, id)) {
+        delete this._callbacks[id];
+      }
     }
   }
 }
@@ -175,79 +191,48 @@ const dispatcher = new Dispatcher();
 
 // ==============================================================
 
-function ipc_send(event, statusArray, payload) {
-  let ipc_send_promisses = [Promise.resolve(0)];
-
-  if (getNumRemoteRenderers() > 0) {
-    ipc_send_promisses = Object.keys(_remoteRenderers).map((id, idx) => {
-      return new Promise((resolve, reject) => {
-        statusArray[idx] = {
-          resolve: resolve,
-          reject: reject
-        }
-
-        _remoteRenderers[id].send(event, { idx: idx, data: payload });
-      })
-    });
-  }
-
-  return Promise.all(ipc_send_promisses);
-}
-
-var ipc_send_event = function (payload) {
-  ipc_send_event_status = Array(_remoteRenderers.length);
-  return ipc_send(DISPATCH_EVENT, ipc_send_event_status, payload);
-}
-
-var ipc_send_clear = function () {
-  ipc_send_clear_status = Array(_remoteRenderers.length);
-  return ipc_send(CLEAR_EVENT, ipc_send_clear_status, '');
-}
-
-var ipc_send_get_num_listeners = function () {
-  ipc_send_get_num_listeners_status = Array(_remoteRenderers.length);
-  return ipc_send(GET_NUM_LISTENERS_EVENT, ipc_send_get_num_listeners_status, '');
-}
-
-// ==============================================================
-
 // on event
 
 ipc.on(DISPATCH_EVENT, (event, args) => {
-  event.sender.send(DISPATCH_EVENT + EVENT_SUFFIX_SUCCESS, { idx: args.idx });
+  event.sender.send(DISPATCH_EVENT + EVENT_SUFFIX_SUCCESS, {
+    idx: args.idx
+  });
   dispatcher._localDispatch(args.data);
 });
 
 ipc.on(CLEAR_EVENT, (event, args) => {
-  event.sender.send(CLEAR_EVENT + EVENT_SUFFIX_SUCCESS, { idx: args.idx });
+  event.sender.send(CLEAR_EVENT + EVENT_SUFFIX_SUCCESS, {
+    idx: args.idx
+  });
   dispatcher._localClear();
 });
 
 ipc.on(GET_NUM_LISTENERS_EVENT, (event, args) => {
-  let numLocalListeners = dispatcher.getNumLocalListeners();
-  event.sender.send(GET_NUM_LISTENERS_EVENT + EVENT_SUFFIX_SUCCESS, { idx: args.idx, data: numLocalListeners });
+  const numLocalListeners = dispatcher.getNumLocalListeners();
+  event.sender.send(GET_NUM_LISTENERS_EVENT + EVENT_SUFFIX_SUCCESS, {
+    idx: args.idx,
+    data: numLocalListeners
+  });
 });
 
 // on event success
 
 ipc.on(DISPATCH_EVENT + EVENT_SUFFIX_SUCCESS, (event, args) => {
-  ipc_send_event_status[args.idx].resolve();
+  ipcSendEventStatus[args.idx].resolve();
 });
 
 ipc.on(CLEAR_EVENT + EVENT_SUFFIX_SUCCESS, (event, args) => {
-  ipc_send_clear_status[args.idx].resolve();
+  ipcSendClearStatus[args.idx].resolve();
 });
 
 ipc.on(GET_NUM_LISTENERS_EVENT + EVENT_SUFFIX_SUCCESS, (event, args) => {
-  ipc_send_get_num_listeners_status[args.idx].resolve(args.data);
+  ipcSendGetNumListenersStatus[args.idx].resolve(args.data);
 });
-
-dispatcher.register
 
 // ==============================================================
 
 module.exports = {
   Dispatcher: dispatcher,
-  addRemoteRenderer: addRemoteRenderer,
-  getNumRemoteRenderers: getNumRemoteRenderers
-}
+  addRemoteRenderer,
+  getNumRemoteRenderers
+};
