@@ -6,8 +6,7 @@
   "author": "Dominik Stamm",
   "license": "MIT",
   "scripts": {
-    "test": "xvfb-maybe electron-mocha ./test/test.js",
-    "test_debug": "xvfb-maybe electron-mocha --debug ./test/test.js"
+    "test": "xo && xvfb-maybe electron-mocha ./test/test.js"
   },
   "repository": "https://github.com/dom8509/dispatchertron.git",
   "bugs": {
