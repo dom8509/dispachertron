@@ -30,6 +30,7 @@
     "eslint-config-xo": "^0.17.0",
     "eslint-config-xo-react": "^0.10.0",
     "eslint-config-xo-space": "^0.15.0",
+    "eslint-plugin-react": "^6.9.0",
     "xo": "^0.17.1",
     "xvfb-maybe": "^0.1.3"
   },
